@@ -81,7 +81,47 @@ class ReportGenerator:
             if patterns:
                  f.write(f"- ✅ **감지된 신호**: {', '.join(patterns)}\n")
             else:
-                 f.write("- ⏳ **특이 패턴 없음**: 컵앤핸들, W패턴 등은 차트 이미지를 통해 육안 확인 권장.\n\n")
+                 f.write("- ⏳ **특이 패턴 없음**: 컵앤핸들, W패턴 등은 차트 이미지를 통해 육안 확인 권장.\n")
+            f.write("\n")
+            
+            # NEW: RSI/MACD/Volume Indicators
+            f.write("**4. 보조지표 분석 (Technical Indicators)**\n")
+            
+            # RSI
+            rsi_val = indicators.get('RSI')
+            rsi_signal = indicators.get('RSI_Signal', 'N/A')
+            if rsi_val is not None:
+                f.write(f"- **RSI (14일)**: {rsi_val:.1f} - {rsi_signal}\n")
+                if rsi_val >= 70:
+                    f.write("  - ⚠️ 과매수 구간: 조정 가능성에 유의\n")
+                elif rsi_val <= 30:
+                    f.write("  - 💡 과매도 구간: 반등 가능성 존재\n")
+            else:
+                f.write("- **RSI**: 데이터 부족\n")
+            
+            # MACD
+            macd_val = indicators.get('MACD')
+            macd_signal = indicators.get('MACD_Signal_Line')
+            macd_cross = indicators.get('MACD_Cross', '없음')
+            if macd_val is not None and macd_signal is not None:
+                f.write(f"- **MACD**: {macd_val:,.0f} / Signal: {macd_signal:,.0f}\n")
+                if '골든' in macd_cross:
+                    f.write(f"  - ✅ {macd_cross}\n")
+                elif '데드' in macd_cross:
+                    f.write(f"  - ⚠️ {macd_cross}\n")
+                elif macd_cross != '없음 (None)':
+                    f.write(f"  - {macd_cross}\n")
+            else:
+                f.write("- **MACD**: 데이터 부족\n")
+            
+            # Volume
+            vol_ratio = indicators.get('Volume_Ratio')
+            vol_signal = indicators.get('Volume_Signal', 'N/A')
+            if vol_ratio is not None:
+                f.write(f"- **거래량**: 20일 평균 대비 {vol_ratio}배 - {vol_signal}\n")
+            else:
+                f.write("- **거래량**: 데이터 부족\n")
+            f.write("\n")
 
             # 3. Fundamental & Market Analysis (New)
             f.write("## 3. 기본적 & 시장 분석 (Fundamental & Market)\n")
@@ -168,25 +208,55 @@ class ReportGenerator:
                 score += 1
             else:
                 score -= 1
+            
+            # 4. NEW: RSI Score
+            rsi_val = indicators.get('RSI')
+            if rsi_val is not None:
+                if rsi_val >= 70:
+                    score -= 1
+                    reasons.append(f"RSI {rsi_val:.1f}로 과매수 구간 - 조정 가능성에 유의")
+                elif rsi_val <= 30:
+                    score += 1
+                    reasons.append(f"RSI {rsi_val:.1f}로 과매도 구간 - 반등 기대")
+            
+            # 5. NEW: MACD Cross Score
+            macd_cross = indicators.get('MACD_Cross', '')
+            if '골든크로스' in macd_cross:
+                score += 1
+                reasons.append(f"MACD {macd_cross}")
+            elif '데드크로스' in macd_cross:
+                score -= 1
+                reasons.append(f"MACD {macd_cross}")
+            
+            # 6. NEW: Volume Score
+            vol_ratio = indicators.get('Volume_Ratio')
+            vol_signal = indicators.get('Volume_Signal', '')
+            if vol_ratio and vol_ratio >= 2.0:
+                if '양봉' in vol_signal or 'Buying' in vol_signal:
+                    score += 1
+                    reasons.append(f"거래량 {vol_ratio}배 급증과 함께 강한 매수세")
+                elif '음봉' in vol_signal or 'Selling' in vol_signal:
+                    score -= 1
+                    reasons.append(f"거래량 {vol_ratio}배 급증과 함께 강한 매도세")
 
             # Determine Verdict
             verdict = "관망 (Hold)"
             color = "🟡"
-            if score >= 3:
+            if score >= 4:
                 verdict = "강력 매수 (Strong Buy)"
                 color = "🟢"
-            elif score >= 1:
+            elif score >= 2:
                 verdict = "매수 (Buy)"
                 color = "🟢"
-            elif score <= -3:
+            elif score <= -4:
                 verdict = "강력 매도 (Strong Sell)"
                 color = "🔴"
-            elif score <= -1:
+            elif score <= -2:
                 verdict = "매도 (Sell)"
                 color = "🔴"
 
             f.write(f"### 📋 종합 의견: {color} **{verdict}**\n")
-            f.write("#### 💡 판단 근거\n")
+            f.write(f"#### 💡 판단 근거 (점수: {score}점)\n")
             for reason in reasons:
                 f.write(f"- {reason}\n")
             

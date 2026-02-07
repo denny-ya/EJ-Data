@@ -135,42 +135,96 @@ class NewsResearcher:
             return []
 
     def _fetch_naver_news(self, query=None):
+        """
+        개선된 네이버 금융 뉴스 크롤링
+        여러 셀렉터를 시도하고, 실패 시 키워드 검색으로 폴백
+        """
         # Naver Finance News URL (focused on specific stock code)
         url = f"https://finance.naver.com/item/news_news.naver?code={self.code}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+        }
+        
+        news_list = []
         
         try:
-            response = requests.get(url, headers=headers)
-            soup = BeautifulSoup(response.content, 'html.parser')
+            response = requests.get(url, headers=headers, timeout=10)
+            response.encoding = 'euc-kr'
+            soup = BeautifulSoup(response.text, 'html.parser')
             
-            news_list = []
-            # Typical structure for Naver Finance news list
-            # Note: This selector might change, need to be robust
-            articles = soup.select('.type5 tbody tr')
+            # 여러 CSS 셀렉터 시도 (네이버 구조 변경 대응)
+            selectors = [
+                # 기존 셀렉터
+                ('.type5 tbody tr', '.title a', '.date'),
+                # 대안 셀렉터 1: 테이블 기반
+                ('table.type5 tr', 'td.title a', 'td.date'),
+                # 대안 셀렉터 2: 뉴스 목록
+                ('.news_list li', 'a.tit', '.info'),
+                # 대안 셀렉터 3: 일반적인 구조
+                ('tbody tr', 'a[href*="news_read"]', 'td:last-child'),
+                # 대안 셀렉터 4: iframe 내부 구조
+                ('#news_frame tbody tr', 'a', 'span.date'),
+            ]
             
-            for article in articles:
-                title_tag = article.select_one('.title a')
-                date_tag = article.select_one('.date')
+            for article_sel, title_sel, date_sel in selectors:
+                articles = soup.select(article_sel)
                 
-                if title_tag and date_tag:
-                    title = title_tag.text.strip()
-                    link = "https://finance.naver.com" + title_tag['href']
-                    date = date_tag.text.strip()
+                for article in articles:
+                    title_tag = article.select_one(title_sel)
+                    date_tag = article.select_one(date_sel)
                     
+                    if title_tag:
+                        title = title_tag.text.strip()
+                        
+                        # 빈 제목 또는 헤더 행 제외
+                        if not title or title in ['제목', '날짜', '정보제공']:
+                            continue
+                            
+                        href = title_tag.get('href', '')
+                        if href and not href.startswith('http'):
+                            link = "https://finance.naver.com" + href
+                        elif href:
+                            link = href
+                        else:
+                            continue
+                        
+                        date = date_tag.text.strip() if date_tag else ""
+                        
+                        news_list.append({
+                            "title": title,
+                            "link": link,
+                            "date": date
+                        })
+                        
+                        if len(news_list) >= 10:
+                            break
+                
+                # 뉴스를 찾았으면 루프 종료
+                if news_list:
+                    print(f"Found {len(news_list)} news with selector: {article_sel}")
+                    break
+            
+            # 셀렉터로 못 찾으면 키워드 검색으로 폴백
+            if not news_list:
+                print(f"Primary crawling failed for {self.code}, trying keyword search...")
+                keyword_news = self._search_naver_news_by_keyword(f"{self.code} 주식", limit=5)
+                for item in keyword_news:
                     news_list.append({
-                        "title": title,
-                        "link": link,
-                        "date": date
+                        "title": item['title'],
+                        "link": item['link'],
+                        "date": ""
                     })
-                    
-                    if len(news_list) >= 10: # Limit to 10 items
-                        break
             
             return news_list
             
+        except requests.exceptions.Timeout:
+            print(f"Timeout fetching news for {self.code}")
+            return self._search_naver_news_by_keyword(f"{self.code} 주식", limit=5)
         except Exception as e:
             print(f"Error fetching news: {e}")
-            return []
+            return self._search_naver_news_by_keyword(f"{self.code} 주식", limit=5)
 
     def _analyze_risks(self, news_items):
         risk_keywords = ["하락", "급락", "악재", "손실", "적자", "둔화", "우려", "불황", "경고", "제재", "소송"]
