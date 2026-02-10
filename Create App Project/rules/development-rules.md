@@ -231,7 +231,8 @@ main (프로덕션)
 | 프레임워크 | React Native + Expo | 필수 | 🔴 높음 | ❌ 불가 |
 | 언어 | TypeScript | 필수 | 🔴 높음 | ❌ 불가 |
 | 상태관리 | Zustand | 전역 상태 | 🟡 중간 | ⭕ 협의 후 |
-| 스타일링 | StyleSheet | RN 기본 | 🟡 중간 | ⭕ 협의 후 |
+| 스타일링 | StyleSheet | RN 기본 | 🟡 중간 | ⭕ 협의 후 (UI 라이브러리 도입 추천) |
+ | **UI 라이브러리** | **React Native Paper** | **Material Design 3 적용** | 🔴 높음 | **강력 추천** |
 | API 통신 | fetch | 기본 사용 | 🟡 중간 | ⭕ 협의 후 |
 | 로컬 저장소 | AsyncStorage | 기본 사용 | 🟡 중간 | ⭕ 협의 후 |
 
@@ -248,6 +249,48 @@ main (프로덕션)
 ---
 
 ---
+ 
+ ## 📱 UI 컴포넌트 전략 (React Native Paper 활용)
+ 
+ > **도입 이유**: 
+ > 1. **Material Design 3** 준수로 별도 디자인 없이도 고품질 UI 제공
+ > 2. **다크 모드** 및 **테마(Theming)** 시스템 기본 내장
+ > 3. 텍스트 입력, 버튼, 카드 등 **이미 만들어진 컴포넌트** 사용으로 개발 속도 2배 향상
+ 
+ ### 🎨 주요 사용 컴포넌트 매핑
+ 
+ | 화면 요소 | Apps Script (기존) | React Native Paper (도입) | 비고 |
+ |-----------|-------------------|-----------------------------|------|
+ | **버튼** | HTML Button | `Button` (mode: contained/outlined) | 터치 효과 자동 적용 |
+ | **입력창** | Input Text | `TextInput` (mode: outlined) | 라벨 애니메이션 포함 |
+ | **리스트** | Table/List | `Card` + `List.Item` | 터치 가능한 리스트 아이템 |
+ | **상단바** | Header | `Appbar.Header` | 뒤로가기, 제목 자동 처리 |
+ | **하단 탭** | - | `BottomNavigation` | 탭 네비게이션과 연동 |
+ | **로딩** | Spinner | `ActivityIndicator` | 플랫폼별 네이티브 로딩 |
+ | **알림** | Alert | `Snackbar`, `Dialog` | 하단 토스트 메시지 및 모달 |
+ 
+ ### 🛠️ 초기 설정 가이드 (`_layout.tsx`)
+ 
+ ```tsx
+ import { PaperProvider, MD3LightTheme } from 'react-native-paper';
+ 
+ export default function Layout() {
+   return (
+     <PaperProvider theme={MD3LightTheme}>
+       <Slot />
+     </PaperProvider>
+   );
+ }
+ ```
+ 
+ #### 📌 리스크 및 대처 방법
+ 
+ | 리스크 | 대처 방법 |
+ |--------|-----------|
+ | 커스텀 디자인 적용 어려움 | `theme` 객체 커스터마이징으로 해결 |
+ | 앱 번들 사이즈 증가 | 트리쉐이킹 적용 (필요한 컴포넌트만 import) |
+ 
+ ---
  
  ## 6. 🚀 모바일 최적화 및 보안 규칙 (Mobile Optimization & Security)
  
